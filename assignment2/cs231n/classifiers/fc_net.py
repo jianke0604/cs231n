@@ -201,7 +201,15 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        first_dim = [input_dim] + hidden_dims
+        second_dim = hidden_dims + [num_classes]
+        for i in range(self.num_layers):
+          self.params['W' + str(i+1)] = np.random.normal(loc=0, scale=weight_scale, size=(first_dim[i], second_dim[i]))
+          self.params['b' + str(i+1)] = np.zeros((second_dim[i]))
+        if self.normalization != None:
+          for i in range(self.num_layers - 1):
+            self.params['gamma' + str(i+1)] = np.ones((first_dim[i+1]))
+            self.params['beta' + str(i+1)] = np.zeros((first_dim[i+1]))
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
