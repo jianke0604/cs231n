@@ -198,7 +198,14 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # might prove to be helpful.                                          #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        sample_mean = np.mean(x, axis=0)
+        sample_var = np.var(x, axis=0)
+        sample_std = np.sqrt(sample_var + eps)
+        out_norm = (x - sample_mean)/sample_std
+        out = gamma*out_norm + beta
+        running_mean = momentum*running_mean + (1-momentum)*sample_mean
+        running_var = momentum*running_var + (1-momentum)*sample_var
+        cache = (out_norm, gamma, sample_std)
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -213,7 +220,10 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Store the result in the out variable.                               #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        test_std = np.sqrt(running_var + eps)
+        out_norm = (x - running_mean)/test_std
+        out = gamma*out_norm + beta
+        cache = (out_norm, gamma, test_std)
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -255,7 +265,33 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    out_norm, gamma, std = cache
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(dout*out_norm, axis=0)
+    dout_norm = dout*gamma
+    N,D = out_norm.shape
+    #x未知，因此不能直接求导，只能一步步反向传播
 
+    # step 1: f=x*y
+    # x = x-mu type:(N,D)
+    # y = 1/sqrt(var + eps) type:(,D)
+    dmulti1 = dout_norm/std  #(N,D)
+    dmulti2 = np.sum(dout_norm*std*out_norm, axis=0) #(,D)
+
+
+    # step 2: f=1/sqrt(var + eps) type:(,D)
+    # x = (x1, x2, ... xn)
+    # df/dxi = (xi-mu)/(N * std**3)
+    # df/d(x-mu) = out_morm/(N * std**2)
+    dmulti2 = -dmulti2 * out_norm / (N * std**2)
+
+    dx_mu = dmulti1 + dmulti2
+
+    # step 3: f=1/N * np.sum(x, axis=0)
+    # df/dx = np.sum(dx_mu, axis=0)/N
+    dmu = np.sum(dx_mu, axis=0)/N
+    dx = dx_mu - dmu
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
