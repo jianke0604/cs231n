@@ -327,6 +327,16 @@ def batchnorm_backward_alt(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    out_norm, gamma, std = cache
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(dout*out_norm, axis=0)
+    dout_norm = dout*gamma
+    N,D = dout.shape
+    dx = (dout - (dgamma*out_norm + dbeta)/N)*gamma/std
+    # dx_mu = dout_norm - 1/N * np.sum(dout_norm, axis=0)
+    # dx_mu1 = dout_norm*out_norm - 1/N * np.sum(dout_norm*out_norm, axis=0)
+    # dx = dx_mu/std - dx_mu1/std*out_norm
+    # 失败的实现
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

@@ -280,10 +280,19 @@ class FullyConnectedNet(object):
         relu_out = []
         relu_cache = []
         for i in range(self.num_layers-1):
+          #affine layer
           out,cache = affine_forward(out, self.params['W'+str(i+1)], self.params['b'+str(i+1)])
           affine_out.append(out)
           affine_cache.append(cache)
+
+          #batchnorm layer
+          if self.normalization == 'batchnorm':
+            out, cache = batchnorm_forward(out, self.params['gamma'+str(i+1)], self.params['beta'+str(i+1)], self.bn_params[i])
+            batchnorm_out.append(out)
+            batchnorm_cache.append(cache)
           out, cache = relu_forward(out)
+
+          #relu layer
           relu_out.append(out)
           relu_cache.append(cache)
         scores, cache = affine_forward(out, self.params['W'+str(self.num_layers)], self.params['b'+str(self.num_layers)])
@@ -318,8 +327,17 @@ class FullyConnectedNet(object):
         loss, dout = softmax_loss(scores, y)
         loss += 0.5*self.reg*(np.sum(np.array([np.sum(np.square(self.params['W'+str(i+1)])) for i in range(self.num_layers)])))
         for i in range(self.num_layers,0,-1):
+          #relu backward
           if (i!=self.num_layers):
             dout=relu_backward(dout, relu_cache[i-1])
+          
+          #batchnorm backward
+            if self.normalization == 'batchnorm':
+              dout, dgamma, dbeta=batchnorm_backward(dout, batchnorm_cache[i-1])
+              grads['gamma'+str(i)] = dgamma
+              grads['beta'+str(i)] = dbeta
+          
+          #affine backward
           dout,dw,db = affine_backward(dout, affine_cache[i-1])
           dw += self.reg*self.params['W'+str(i)]
           grads['W'+str(i)] = dw
