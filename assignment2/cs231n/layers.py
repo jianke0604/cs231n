@@ -382,7 +382,15 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    xt = x.T
+    mean = np.mean(xt, axis=0) 
+    #type:(,N)
+    var = np.var(xt, axis=0) 
+    # type:(,N)
+    std = np.sqrt(var + eps)
+    x_norm = ((xt - mean)/std).T
+    out = gamma * x_norm + beta
+    cache = (x_norm, gamma, std)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -418,6 +426,35 @@ def layernorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    out_norm, gamma, std = cache
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(dout*out_norm, axis=0)
+    dout_norm = dout*gamma
+    dout_norm = dout_norm.T #(D,N)
+    N,D = out_norm.shape
+    out_norm = out_norm.T #(D,N)
+    #x未知，因此不能直接求导，只能一步步反向传播
+
+    # step 1: f=x*y
+    # xt = xt-mu type:(D,N)
+    # y = 1/sqrt(var + eps) type:(,N)
+    dmulti1 = dout_norm/std  #(D,N)
+    dmulti2 = np.sum(dout_norm*std*out_norm, axis=0) #(,N)
+
+
+    # step 2: f=1/sqrt(var + eps) type:(,N)
+    # x = (x1, x2, ... xd)
+    # df/dxi = (xi-mu)/(D * std**3)
+    # df/d(x-mu) = out_morm/(N * std**2)
+    dmulti2 = -dmulti2 * out_norm / (D * std**2)
+
+    dx_mu = dmulti1 + dmulti2
+
+    # step 3: f=1/D * np.sum(x, axis=0)
+    # df/dx = np.sum(dx_mu, axis=0)/D
+    dmu = np.sum(dx_mu, axis=0)/D
+    dx = dx_mu - dmu
+    dx = dx.T
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
