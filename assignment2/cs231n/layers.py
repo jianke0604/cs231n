@@ -332,11 +332,16 @@ def batchnorm_backward_alt(dout, cache):
     dgamma = np.sum(dout*out_norm, axis=0)
     dout_norm = dout*gamma
     N,D = dout.shape
+    # dvar = np.sum(dout_norm*(-0.5)*out_norm/std**2, axis=0)
+    # dmu = -np.sum(dout_norm/std, axis=0)
+    # dx = dout_norm/std + dvar*std*out_norm*2/N + dmu/N
     dx = (dout - (dgamma*out_norm + dbeta)/N)*gamma/std
+
+    # 失败的实现
     # dx_mu = dout_norm - 1/N * np.sum(dout_norm, axis=0)
     # dx_mu1 = dout_norm*out_norm - 1/N * np.sum(dout_norm*out_norm, axis=0)
     # dx = dx_mu/std - dx_mu1/std*out_norm
-    # 失败的实现
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -503,7 +508,8 @@ def dropout_forward(x, dropout_param):
         # Store the dropout mask in the mask variable.                        #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        mask = (np.random.rand(*x.shape) < p)/p
+        out = x * mask
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -515,7 +521,7 @@ def dropout_forward(x, dropout_param):
         # TODO: Implement the test phase forward pass for inverted dropout.   #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        out = x
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -546,7 +552,7 @@ def dropout_backward(dout, cache):
         # TODO: Implement training phase backward pass for inverted dropout   #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        dx = dout * mask
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

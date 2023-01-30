@@ -271,30 +271,39 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-        data = X.copy()
         out = X.copy()
         affine_out = []
         affine_cache = []
         batchnorm_out = []
         batchnorm_cache = []
+        layernorm_cache = []
         relu_out = []
         relu_cache = []
+        dropout_cache = []
         for i in range(self.num_layers-1):
           #affine layer
           out,cache = affine_forward(out, self.params['W'+str(i+1)], self.params['b'+str(i+1)])
           affine_out.append(out)
           affine_cache.append(cache)
 
-          #batchnorm layer
+          #batchnorm layer or layernorm
           if self.normalization == 'batchnorm':
             out, cache = batchnorm_forward(out, self.params['gamma'+str(i+1)], self.params['beta'+str(i+1)], self.bn_params[i])
             batchnorm_out.append(out)
             batchnorm_cache.append(cache)
-          out, cache = relu_forward(out)
-
+          if self.normalization == 'layernorm':
+            out, cache = layernorm_forward(out, self.params['gamma'+str(i+1)], self.params['beta'+str(i+1)], self.bn_params[i])
+            layernorm_cache.append(cache)
+          
           #relu layer
+          out, cache = relu_forward(out)
           relu_out.append(out)
           relu_cache.append(cache)
+
+          #dropout layer
+          if self.use_dropout:
+            out, cache = dropout_forward(out, self.dropout_param)
+            dropout_cache.append(cache)
         scores, cache = affine_forward(out, self.params['W'+str(self.num_layers)], self.params['b'+str(self.num_layers)])
         affine_out.append(scores)
         affine_cache.append(cache)
@@ -326,17 +335,26 @@ class FullyConnectedNet(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         loss, dout = softmax_loss(scores, y)
         loss += 0.5*self.reg*(np.sum(np.array([np.sum(np.square(self.params['W'+str(i+1)])) for i in range(self.num_layers)])))
-        for i in range(self.num_layers,0,-1):
-          #relu backward
+        for i in range(self.num_layers,0,-1):      
           if (i!=self.num_layers):
+            #dropout backward
+            if self.use_dropout:
+              dout = dropout_backward(dout, dropout_cache[i-1])
+
+            #relu backward
             dout=relu_backward(dout, relu_cache[i-1])
           
-          #batchnorm backward
+            #batchnorm backward
             if self.normalization == 'batchnorm':
               dout, dgamma, dbeta=batchnorm_backward(dout, batchnorm_cache[i-1])
               grads['gamma'+str(i)] = dgamma
               grads['beta'+str(i)] = dbeta
           
+            #layernorm backward
+            if self.normalization == 'layernorm':
+              dout, dgamma, dbeta = layernorm_backward(dout, layernorm_cache[i-1])
+              grads['gamma'+str(i)] = dgamma
+              grads['beta'+str(i)] = dbeta
           #affine backward
           dout,dw,db = affine_backward(dout, affine_cache[i-1])
           dw += self.reg*self.params['W'+str(i)]
