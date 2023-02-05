@@ -616,7 +616,11 @@ def conv_forward_naive(x, w, b, conv_param):
             j_out = 0
             for j in range(0, last_col, stride):
                 x_current = x_pad[:, :, i:(i+HH), j:(j+WW)]
-                out[:, f, i_out, j_out] = np.dot(x_current.reshape((N, -1)), w[f].flatten()) + b[f]
+                # print(x_current.shape)
+                # print(w[f].shape)
+                # print(b[f].shape)
+                # print(out[:, f, i_out, j_out].shape)
+                out[:, f, i_out, j_out] = np.sum(x_current * w[f], axis=(1,2,3)) + b[f]
                 j_out += 1
             i_out += 1
 
@@ -649,6 +653,37 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    x,w,b,conv_param = cache
+    stride = conv_param['stride']
+    pad = conv_param['pad']
+    x_pad = np.pad(x, ((0,0),(0,0), (pad, pad), (pad, pad)), 'constant')
+    N, C, H, W = x.shape
+    F, C_filter, HH, WW = w.shape
+    new_H = int(1 + (H + 2 * pad - HH) / stride)
+    new_W = int(1 + (W + 2 * pad - WW) / stride)
+    last_row = H + 2*pad - HH + 1
+    last_col = W + 2*pad - WW + 1
+
+    dx = np.zeros((x.shape))
+    dw = np.zeros((w.shape))
+    dx_pad = np.zeros((x_pad.shape))
+    db = np.sum(dout, axis=(0,2,3))
+    for f in range(F):
+        i_out = 0
+        for i in range(0, last_row, stride):
+            j_out = 0
+            for j in range(0, last_col, stride):
+                x_current = x_pad[:, :, i:(i+HH), j:(j+WW)]
+                # print(x_current.shape)
+                # print(w[f].shape)
+                # print(b[f].shape)
+                # print(out[:, f, i_out, j_out].shape)
+                # out[:, f, i_out, j_out] = np.sum(x_current * w[f], axis=(1,2,3)) + b[f]
+                dw[f] += np.sum(dout[:, f, i_out, j_out].reshape(N,1,1,1) * x_current, axis=0) 
+                dx_pad[:, :, i:(i+HH), j:(j+HH)] += dout[:, f, i_out, j_out].reshape(N,1,1,1) * w[f]
+                j_out += 1
+            i_out += 1
+    dx = dx_pad[:, :, pad:-pad, pad:-pad]
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -683,6 +718,25 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    N,C,H,W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+    new_H = int(1 + (H - pool_height) / stride)
+    new_W = int(1 + (W - pool_width) / stride)
+    last_row = H - pool_height + 1
+    last_col = W - pool_width + 1
+
+    out = np.zeros((N, C, new_H, new_W))
+    i_out = 0
+    for i in range(0, last_row, stride):
+      j_out = 0
+      for j in range(0, last_col, stride):
+        x_current = x[:, :, i:(i+pool_height), j:(j+pool_width)]
+        out[:, :, i_out, j_out] = np.max(x_current, axis=(2,3))
+        j_out += 1
+      i_out += 1
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -709,7 +763,26 @@ def max_pool_backward_naive(dout, cache):
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    
+    x, pool_param = cache
+    N,C,H,W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+    last_row = H - pool_height + 1
+    last_col = W - pool_width + 1
 
+    dx = np.zeros((x.shape))
+    i_out = 0
+    for i in range(0, last_row, stride):
+      j_out = 0
+      for j in range(0, last_col, stride):
+        x_current = x[:, :, i:(i+pool_height), j:(j+pool_width)]
+        # out[:, :, i_out, j_out] = np.max(x_current, axis=(2,3))
+        tmp = (x_current == np.max(x_current, axis=(2,3), keepdims=1))
+        dx[:, :, i:(i+pool_height), j:(j+pool_width)] += dout[:, :, i_out, j_out].reshape(N,C,1,1) * tmp
+        j_out += 1
+      i_out += 1
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
