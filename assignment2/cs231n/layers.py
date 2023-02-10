@@ -825,6 +825,11 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    N, C, H, W = x.shape
+    x_T = x.transpose(0,2,3,1)
+    x_T = x_T.reshape(-1, C) #(N*H*W, C)
+    out, cache = batchnorm_forward(x_T, gamma, beta, bn_param)
+    out = out.reshape(N, H, W, C).transpose(0,3,1,2)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -858,7 +863,10 @@ def spatial_batchnorm_backward(dout, cache):
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    N, C, H, W = dout.shape
+    dout_T = dout.transpose(0,2,3,1).reshape(-1, C)
+    dx, dgamma, dbeta = batchnorm_backward_alt(dout_T, cache)
+    dx = dx.reshape(N, H, W, C).transpose(0,3,1,2)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -898,7 +906,17 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # and layer normalization!                                                #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    N,C,H,W = x.shape
+    x_norm  = x.reshape(N,G,C//G,H,W)
+    mean = x_norm.mean(axis=(2,3,4),keepdims=True)
+    var  = x_norm.var(axis=(2,3,4))
+    std  = np.sqrt(var + eps).reshape(N,G,1,1,1)
+    x_norm  = (x_norm-mean)/std
+    x_norm  = x_norm.reshape(N,C,H,W)
+    gamma   = gamma.reshape(1,C,1,1)
+    beta    = beta.reshape(1,C,1,1)
+    out  = x_norm * gamma + beta
+    cache = (x_norm, gamma, std, G)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -928,6 +946,43 @@ def spatial_groupnorm_backward(dout, cache):
     # This will be extremely similar to the layer norm implementation.        #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    out_norm, gamma, std, G = cache
+    N,C,H,W = out_norm.shape
+    # print(out_norm.shape)
+    dbeta = np.sum(dout, axis=(0,2,3), keepdims=True)
+    dgamma = np.sum(dout*out_norm, axis=(0,2,3), keepdims=True)
+    
+    out_norm = out_norm.reshape(N*G, C//G *H*W)
+    dout_norm = (dout*gamma).reshape(N*G, C//G *H*W)
+    dout_norm = dout_norm.T #(D,N)
+    std = std.reshape(N*G)
+    N1,D = out_norm.shape
+    out_norm = out_norm.T #(D,N)
+    #x未知，因此不能直接求导，只能一步步反向传播
+
+    # step 1: f=x*y
+    # xt = xt-mu type:(D,N)
+    # y = 1/sqrt(var + eps) type:(,N)
+    dmulti1 = dout_norm/std  #(D,N)
+    dmulti2 = np.sum(dout_norm*std*out_norm, axis=0) #(,N)
+
+
+    # step 2: f=1/sqrt(var + eps) type:(,N)
+    # x = (x1, x2, ... xd)
+    # df/dxi = (xi-mu)/(D * std**3)
+    # df/d(x-mu) = out_morm/(N * std**2)
+    dmulti2 = -dmulti2 * out_norm / (D * std**2)
+
+    dx_mu = dmulti1 + dmulti2
+    # print (dx_mu.shape)
+
+    # step 3: f=1/D * np.sum(x, axis=0)
+    # df/dx = np.sum(dx_mu, axis=0)/D
+    dmu = np.sum(dx_mu, axis=0)/D
+    dx = dx_mu - dmu
+    dx = dx.T
+    # print(dx.shape)
+    dx = dx.reshape(N,C,H,W)
 
     pass
 
